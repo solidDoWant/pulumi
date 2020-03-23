@@ -180,7 +180,7 @@ type Backend interface {
 	UpdateStackTags(ctx context.Context, stack Stack, tags map[apitype.StackTagName]string) error
 
 	// ExportDeployment exports the deployment for the given stack as an opaque JSON message.
-	ExportDeployment(ctx context.Context, stack Stack) (*apitype.UntypedDeployment, error)
+	ExportDeployment(ctx context.Context, stack Stack, showSecrets bool) (*apitype.UntypedDeployment, error)
 	// ImportDeployment imports the given deployment into the indicated stack.
 	ImportDeployment(ctx context.Context, stack Stack, deployment *apitype.UntypedDeployment) error
 	// Logout logs you out of the backend and removes any stored credentials.
@@ -197,7 +197,8 @@ type SpecificDeploymentExporter interface {
 	// version is backend-specific. For the Pulumi Console, it is the numeric version. (The first update
 	// being version "1", the second "2", and so on.) Though this might change in the future to use some
 	// other type of identifier or commitish .
-	ExportDeploymentForVersion(ctx context.Context, stack Stack, version string) (*apitype.UntypedDeployment, error)
+	ExportDeploymentForVersion(ctx context.Context, stack Stack, version string,
+		showSecrets bool) (*apitype.UntypedDeployment, error)
 }
 
 // UpdateOperation is a complete stack update operation (preview, update, refresh, or destroy).

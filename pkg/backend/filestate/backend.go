@@ -643,7 +643,7 @@ func GetLogsForTarget(target *deploy.Target, query operations.LogQuery) ([]opera
 }
 
 func (b *localBackend) ExportDeployment(ctx context.Context,
-	stk backend.Stack) (*apitype.UntypedDeployment, error) {
+	stk backend.Stack, showSecrets bool) (*apitype.UntypedDeployment, error) {
 
 	stackName := stk.Ref().Name()
 	snap, _, err := b.getStack(stackName)
@@ -655,7 +655,7 @@ func (b *localBackend) ExportDeployment(ctx context.Context,
 		snap = deploy.NewSnapshot(deploy.Manifest{}, nil, nil, nil)
 	}
 
-	sdep, err := stack.SerializeDeployment(snap, snap.SecretsManager)
+	sdep, err := stack.SerializeDeployment(snap, snap.SecretsManager, showSecrets)
 	if err != nil {
 		return nil, errors.Wrap(err, "serializing deployment")
 	}

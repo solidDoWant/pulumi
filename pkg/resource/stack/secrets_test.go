@@ -43,7 +43,7 @@ func (t *testSecretsManager) DecryptValue(ciphertext string) (string, error) {
 	return ciphertext[i+1:], nil
 }
 
-func deserializeProperty(v interface{}, dec config.Decrypter) (resource.PropertyValue, error) {
+func deserializeProperty(v interface{}, dec config.Decrypter, enc config.Encrypter) (resource.PropertyValue, error) {
 	b, err := json.Marshal(v)
 	if err != nil {
 		return resource.PropertyValue{}, err
@@ -51,12 +51,14 @@ func deserializeProperty(v interface{}, dec config.Decrypter) (resource.Property
 	if err := json.Unmarshal(b, &v); err != nil {
 		return resource.PropertyValue{}, err
 	}
-	return DeserializePropertyValue(v, dec)
+	return DeserializePropertyValue(v, dec, enc)
 }
 
 func TestCachingCrypter(t *testing.T) {
 	sm := &testSecretsManager{}
 	csm := NewCachingSecretsManager(sm)
+
+	showSecrets := false
 
 	foo1 := resource.MakeSecret(resource.NewStringProperty("foo"))
 	foo2 := resource.MakeSecret(resource.NewStringProperty("foo"))
@@ -66,38 +68,38 @@ func TestCachingCrypter(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Serialize the first copy of "foo". Encrypt should be called once, as this value has not yet been encrypted.
-	foo1Ser, err := SerializePropertyValue(foo1, enc)
+	foo1Ser, err := SerializePropertyValue(foo1, enc, showSecrets)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, sm.encryptCalls)
 
 	// Serialize the second copy of "foo". Because this is a different secret instance, Encrypt should be called
 	// a second time even though the plaintext is the same as the last value we encrypted.
-	foo2Ser, err := SerializePropertyValue(foo2, enc)
+	foo2Ser, err := SerializePropertyValue(foo2, enc, showSecrets)
 	assert.NoError(t, err)
 	assert.Equal(t, 2, sm.encryptCalls)
 	assert.NotEqual(t, foo1Ser, foo2Ser)
 
 	// Serialize "bar". Encrypt should be called once, as this value has not yet been encrypted.
-	barSer, err := SerializePropertyValue(bar, enc)
+	barSer, err := SerializePropertyValue(bar, enc, showSecrets)
 	assert.NoError(t, err)
 	assert.Equal(t, 3, sm.encryptCalls)
 
 	// Serialize the first copy of "foo" again. Encrypt should not be called, as this value has already been
 	// encrypted.
-	foo1Ser2, err := SerializePropertyValue(foo1, enc)
+	foo1Ser2, err := SerializePropertyValue(foo1, enc, showSecrets)
 	assert.NoError(t, err)
 	assert.Equal(t, 3, sm.encryptCalls)
 	assert.Equal(t, foo1Ser, foo1Ser2)
 
 	// Serialize the second copy of "foo" again. Encrypt should not be called, as this value has already been
 	// encrypted.
-	foo2Ser2, err := SerializePropertyValue(foo2, enc)
+	foo2Ser2, err := SerializePropertyValue(foo2, enc, showSecrets)
 	assert.NoError(t, err)
 	assert.Equal(t, 3, sm.encryptCalls)
 	assert.Equal(t, foo2Ser, foo2Ser2)
 
 	// Serialize "bar" again. Encrypt should not be called, as this value has already been encrypted.
-	barSer2, err := SerializePropertyValue(bar, enc)
+	barSer2, err := SerializePropertyValue(bar, enc, showSecrets)
 	assert.NoError(t, err)
 	assert.Equal(t, 3, sm.encryptCalls)
 	assert.Equal(t, barSer, barSer2)
@@ -105,20 +107,23 @@ func TestCachingCrypter(t *testing.T) {
 	dec, err := csm.Decrypter()
 	assert.NoError(t, err)
 
+	enc, encErr := csm.Encrypter()
+	assert.NoError(t, encErr)
+
 	// Decrypt foo1Ser. Decrypt should be called.
-	foo1Dec, err := deserializeProperty(foo1Ser, dec)
+	foo1Dec, err := deserializeProperty(foo1Ser, dec, enc)
 	assert.NoError(t, err)
 	assert.True(t, foo1.DeepEquals(foo1Dec))
 	assert.Equal(t, 1, sm.decryptCalls)
 
 	// Decrypt foo2Ser. Decrypt should be called.
-	foo2Dec, err := deserializeProperty(foo2Ser, dec)
+	foo2Dec, err := deserializeProperty(foo2Ser, dec, enc)
 	assert.NoError(t, err)
 	assert.True(t, foo2.DeepEquals(foo2Dec))
 	assert.Equal(t, 2, sm.decryptCalls)
 
 	// Decrypt barSer. Decrypt should be called.
-	barDec, err := deserializeProperty(barSer, dec)
+	barDec, err := deserializeProperty(barSer, dec, enc)
 	assert.NoError(t, err)
 	assert.True(t, bar.DeepEquals(barDec))
 	assert.Equal(t, 3, sm.decryptCalls)
@@ -130,20 +135,23 @@ func TestCachingCrypter(t *testing.T) {
 	dec, err = csm.Decrypter()
 	assert.NoError(t, err)
 
+	enc, encErr = csm.Encrypter()
+	assert.NoError(t, encErr)
+
 	// Decrypt foo1Ser. Decrypt should be called.
-	foo1Dec, err = deserializeProperty(foo1Ser, dec)
+	foo1Dec, err = deserializeProperty(foo1Ser, dec, enc)
 	assert.NoError(t, err)
 	assert.True(t, foo1.DeepEquals(foo1Dec))
 	assert.Equal(t, 4, sm.decryptCalls)
 
 	// Decrypt foo2Ser. Decrypt should be called.
-	foo2Dec, err = deserializeProperty(foo2Ser, dec)
+	foo2Dec, err = deserializeProperty(foo2Ser, dec, enc)
 	assert.NoError(t, err)
 	assert.True(t, foo2.DeepEquals(foo2Dec))
 	assert.Equal(t, 5, sm.decryptCalls)
 
 	// Decrypt barSer. Decrypt should be called.
-	barDec, err = deserializeProperty(barSer, dec)
+	barDec, err = deserializeProperty(barSer, dec, enc)
 	assert.NoError(t, err)
 	assert.True(t, bar.DeepEquals(barDec))
 	assert.Equal(t, 6, sm.decryptCalls)
@@ -153,21 +161,21 @@ func TestCachingCrypter(t *testing.T) {
 
 	// Serialize the first copy of "foo" again. Encrypt should not be called, as this value has already been
 	// cached by the earlier calls to Decrypt.
-	foo1Ser2, err = SerializePropertyValue(foo1Dec, enc)
+	foo1Ser2, err = SerializePropertyValue(foo1Dec, enc, showSecrets)
 	assert.NoError(t, err)
 	assert.Equal(t, 3, sm.encryptCalls)
 	assert.Equal(t, foo1Ser, foo1Ser2)
 
 	// Serialize the second copy of "foo" again. Encrypt should not be called, as this value has already been
 	// cached by the earlier calls to Decrypt.
-	foo2Ser2, err = SerializePropertyValue(foo2Dec, enc)
+	foo2Ser2, err = SerializePropertyValue(foo2Dec, enc, showSecrets)
 	assert.NoError(t, err)
 	assert.Equal(t, 3, sm.encryptCalls)
 	assert.Equal(t, foo2Ser, foo2Ser2)
 
 	// Serialize "bar" again. Encrypt should not be called, as this value has already been cached by the
 	// earlier calls to Decrypt.
-	barSer2, err = SerializePropertyValue(barDec, enc)
+	barSer2, err = SerializePropertyValue(barDec, enc, showSecrets)
 	assert.NoError(t, err)
 	assert.Equal(t, 3, sm.encryptCalls)
 	assert.Equal(t, barSer, barSer2)

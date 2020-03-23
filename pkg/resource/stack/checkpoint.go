@@ -85,7 +85,7 @@ func SerializeCheckpoint(stack tokens.QName, snap *deploy.Snapshot,
 	// If snap is nil, that's okay, we will just create an empty deployment; otherwise, serialize the whole snapshot.
 	var latest *apitype.DeploymentV3
 	if snap != nil {
-		dep, err := SerializeDeployment(snap, sm)
+		dep, err := SerializeDeployment(snap, sm, false /* showSecrets */)
 		if err != nil {
 			return nil, errors.Wrap(err, "serializing deployment")
 		}

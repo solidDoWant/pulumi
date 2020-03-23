@@ -57,7 +57,7 @@ type Stack interface {
 	// list log entries for this stack.
 	GetLogs(ctx context.Context, cfg StackConfiguration, query operations.LogQuery) ([]operations.LogEntry, error)
 	// export this stack's deployment.
-	ExportDeployment(ctx context.Context) (*apitype.UntypedDeployment, error)
+	ExportDeployment(ctx context.Context, showSecrets bool) (*apitype.UntypedDeployment, error)
 	// import the given deployment into this stack.
 	ImportDeployment(ctx context.Context, deployment *apitype.UntypedDeployment) error
 }
@@ -110,8 +110,8 @@ func GetStackLogs(ctx context.Context, s Stack, cfg StackConfiguration,
 }
 
 // ExportStackDeployment exports the given stack's deployment as an opaque JSON message.
-func ExportStackDeployment(ctx context.Context, s Stack) (*apitype.UntypedDeployment, error) {
-	return s.Backend().ExportDeployment(ctx, s)
+func ExportStackDeployment(ctx context.Context, s Stack, showSecrets bool) (*apitype.UntypedDeployment, error) {
+	return s.Backend().ExportDeployment(ctx, s, showSecrets)
 }
 
 // ImportStackDeployment imports the given deployment into the indicated stack.

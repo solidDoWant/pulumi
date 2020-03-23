@@ -230,7 +230,7 @@ func (b *cloudBackend) newQuery(ctx context.Context,
 	return &cloudQuery{root: op.Root, proj: op.Proj}, nil
 }
 
-func (b *cloudBackend) newUpdate(ctx context.Context, stackRef backend.StackReference, op backend.UpdateOperation,
+func (b *cloudBackend) newUpdate(ctx context.Context, stk backend.Stack, op backend.UpdateOperation,
 	update client.UpdateIdentifier, token string) (*cloudUpdate, error) {
 
 	// Create a token source for this update if necessary.
@@ -244,7 +244,7 @@ func (b *cloudBackend) newUpdate(ctx context.Context, stackRef backend.StackRefe
 	}
 
 	// Construct the deployment target.
-	target, err := b.getTarget(ctx, stackRef, op.StackConfiguration.Config, op.StackConfiguration.Decrypter)
+	target, err := b.getTarget(ctx, stk, op.StackConfiguration.Config, op.StackConfiguration.Decrypter)
 	if err != nil {
 		return nil, err
 	}
@@ -261,8 +261,9 @@ func (b *cloudBackend) newUpdate(ctx context.Context, stackRef backend.StackRefe
 	}, nil
 }
 
-func (b *cloudBackend) getSnapshot(ctx context.Context, stackRef backend.StackReference) (*deploy.Snapshot, error) {
-	untypedDeployment, err := b.exportDeployment(ctx, stackRef, nil /* get latest */)
+func (b *cloudBackend) getSnapshot(ctx context.Context, stk backend.Stack) (*deploy.Snapshot, error) {
+	untypedDeployment, err := b.exportDeployment(ctx, stk, nil, /* get latest */
+		false /* showSecrets */)
 	if err != nil {
 		return nil, err
 	}
@@ -275,25 +276,25 @@ func (b *cloudBackend) getSnapshot(ctx context.Context, stackRef backend.StackRe
 	return snapshot, nil
 }
 
-func (b *cloudBackend) getTarget(ctx context.Context, stackRef backend.StackReference,
+func (b *cloudBackend) getTarget(ctx context.Context, stk backend.Stack,
 	cfg config.Map, dec config.Decrypter) (*deploy.Target, error) {
 
-	snapshot, err := b.getSnapshot(ctx, stackRef)
+	snapshot, err := b.getSnapshot(ctx, stk)
 	if err != nil {
 		switch err {
 		case stack.ErrDeploymentSchemaVersionTooOld:
 			return nil, fmt.Errorf("the stack '%s' is too old to be used by this version of the Pulumi CLI",
-				stackRef.Name())
+				stk.Ref())
 		case stack.ErrDeploymentSchemaVersionTooNew:
 			return nil, fmt.Errorf("the stack '%s' is newer than what this version of the Pulumi CLI understands. "+
-				"Please update your version of the Pulumi CLI", stackRef.Name())
+				"Please update your version of the Pulumi CLI", stk.Ref().Name())
 		default:
 			return nil, errors.Wrap(err, "could not deserialize deployment")
 		}
 	}
 
 	return &deploy.Target{
-		Name:      stackRef.Name(),
+		Name:      stk.Ref().Name(),
 		Config:    cfg,
 		Decrypter: dec,
 		Snapshot:  snapshot,

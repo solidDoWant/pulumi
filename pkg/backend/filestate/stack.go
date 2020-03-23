@@ -89,8 +89,8 @@ func (s *localStack) GetLogs(ctx context.Context, cfg backend.StackConfiguration
 	return backend.GetStackLogs(ctx, s, cfg, query)
 }
 
-func (s *localStack) ExportDeployment(ctx context.Context) (*apitype.UntypedDeployment, error) {
-	return backend.ExportStackDeployment(ctx, s)
+func (s *localStack) ExportDeployment(ctx context.Context, showSecrets bool) (*apitype.UntypedDeployment, error) {
+	return backend.ExportStackDeployment(ctx, s, showSecrets)
 }
 
 func (s *localStack) ImportDeployment(ctx context.Context, deployment *apitype.UntypedDeployment) error {

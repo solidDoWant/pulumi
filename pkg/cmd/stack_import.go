@@ -130,7 +130,7 @@ func newStackImportCmd() *cobra.Command {
 
 				snapshot.PendingOperations = nil
 			}
-			sdp, err := stack.SerializeDeployment(snapshot, snapshot.SecretsManager)
+			sdp, err := stack.SerializeDeployment(snapshot, snapshot.SecretsManager, false /* showSecrets */)
 			if err != nil {
 				return errors.Wrap(err, "constructing deployment for upload")
 			}

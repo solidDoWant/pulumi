@@ -8,6 +8,8 @@ CHANGELOG
   [#4141](https://github.com/pulumi/pulumi/pull/4141)
 - Add missing builtin `MapArray` to Go SDK.
   [#4144](https://github.com/pulumi/pulumi/pull/4144)
+- Allow secrets to be decrypted when exporting a stack
+  [#4046](https://github.com/pulumi/pulumi/pull/4046)
 
 ## 1.13.0 (2020-03-18)
 - Add support for plugin acquisition for Go programs

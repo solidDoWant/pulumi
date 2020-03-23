@@ -18,6 +18,7 @@ import (
 	"context"
 	cryptorand "crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net"
@@ -41,6 +42,7 @@ import (
 	"github.com/pulumi/pulumi/pkg/engine"
 	"github.com/pulumi/pulumi/pkg/operations"
 	"github.com/pulumi/pulumi/pkg/resource/deploy"
+	"github.com/pulumi/pulumi/pkg/resource/stack"
 	"github.com/pulumi/pulumi/pkg/secrets"
 	"github.com/pulumi/pulumi/sdk/go/common/apitype"
 	"github.com/pulumi/pulumi/sdk/go/common/diag"
@@ -936,7 +938,7 @@ func (b *cloudBackend) apply(
 		}
 	}
 
-	return b.runEngineAction(ctx, kind, stack.Ref(), op, update, token, events, opts.DryRun)
+	return b.runEngineAction(ctx, kind, stack, op, update, token, events, opts.DryRun)
 }
 
 // query executes a query program against the resource outputs of a stack hosted in the Pulumi
@@ -948,12 +950,12 @@ func (b *cloudBackend) query(ctx context.Context, op backend.QueryOperation,
 }
 
 func (b *cloudBackend) runEngineAction(
-	ctx context.Context, kind apitype.UpdateKind, stackRef backend.StackReference,
+	ctx context.Context, kind apitype.UpdateKind, stk backend.Stack,
 	op backend.UpdateOperation, update client.UpdateIdentifier, token string,
 	callerEventsOpt chan<- engine.Event, dryRun bool) (engine.ResourceChanges, result.Result) {
 
 	contract.Assertf(token != "", "persisted actions require a token")
-	u, err := b.newUpdate(ctx, stackRef, op, update, token)
+	u, err := b.newUpdate(ctx, stk, op, update, token)
 	if err != nil {
 		return nil, result.FromError(err)
 	}
@@ -963,7 +965,7 @@ func (b *cloudBackend) runEngineAction(
 	displayEvents := make(chan engine.Event)
 	displayDone := make(chan bool)
 	go u.RecordAndDisplayEvents(
-		backend.ActionLabel(kind, dryRun), kind, stackRef, op,
+		backend.ActionLabel(kind, dryRun), kind, stk.Ref(), op,
 		displayEvents, displayDone, op.Opts.Display, dryRun)
 
 	// The engineEvents channel receives all events from the engine, which we then forward onto other
@@ -1159,7 +1161,7 @@ func convertConfig(apiConfig map[string]apitype.ConfigValue) (config.Map, error)
 func (b *cloudBackend) GetLogs(ctx context.Context, stack backend.Stack, cfg backend.StackConfiguration,
 	logQuery operations.LogQuery) ([]operations.LogEntry, error) {
 
-	target, targetErr := b.getTarget(ctx, stack.Ref(), cfg.Config, cfg.Decrypter)
+	target, targetErr := b.getTarget(ctx, stack, cfg.Config, cfg.Decrypter)
 	if targetErr != nil {
 		return nil, targetErr
 	}
@@ -1167,12 +1169,12 @@ func (b *cloudBackend) GetLogs(ctx context.Context, stack backend.Stack, cfg bac
 }
 
 func (b *cloudBackend) ExportDeployment(ctx context.Context,
-	stack backend.Stack) (*apitype.UntypedDeployment, error) {
-	return b.exportDeployment(ctx, stack.Ref(), nil /* latest */)
+	stack backend.Stack, showSecrets bool) (*apitype.UntypedDeployment, error) {
+	return b.exportDeployment(ctx, stack, nil /* latest */, showSecrets)
 }
 
 func (b *cloudBackend) ExportDeploymentForVersion(
-	ctx context.Context, stack backend.Stack, version string) (*apitype.UntypedDeployment, error) {
+	ctx context.Context, stack backend.Stack, version string, showSecrets bool) (*apitype.UntypedDeployment, error) {
 	// The Pulumi Console defines versions as a positive integer. Parse the provided version string and
 	// ensure it is valid.
 	//
@@ -1182,18 +1184,47 @@ func (b *cloudBackend) ExportDeploymentForVersion(
 		return nil, errors.Errorf("%q is not a valid stack version. It should be a positive integer.", version)
 	}
 
-	return b.exportDeployment(ctx, stack.Ref(), &versionNumber)
+	return b.exportDeployment(ctx, stack, &versionNumber, showSecrets)
 }
 
 // exportDeployment exports the checkpoint file for a stack, optionally getting a previous version.
 func (b *cloudBackend) exportDeployment(
-	ctx context.Context, stackRef backend.StackReference, version *int) (*apitype.UntypedDeployment, error) {
+	ctx context.Context, stk backend.Stack, version *int, showSecrets bool) (*apitype.UntypedDeployment, error) {
+	stackRef := stk.Ref()
+	if showSecrets {
+		// get the snapshot
+		snap, err := b.getSnapshot(ctx, stk)
+
+		if err != nil {
+			return nil, err
+		}
+
+		if snap == nil {
+			snap = deploy.NewSnapshot(deploy.Manifest{}, nil, nil, nil)
+		}
+
+		sdep, err := stack.SerializeDeployment(snap, snap.SecretsManager, showSecrets)
+		if err != nil {
+			return nil, errors.Wrap(err, "serializing deployment")
+		}
+
+		data, err := json.Marshal(sdep)
+		if err != nil {
+			return nil, err
+		}
+
+		return &apitype.UntypedDeployment{
+			Version:    3,
+			Deployment: json.RawMessage(data),
+		}, nil
+	}
+
 	stack, err := b.getCloudStackIdentifier(stackRef)
 	if err != nil {
 		return nil, err
 	}
 
-	deployment, err := b.client.ExportStackDeployment(ctx, stack, version)
+	deployment, err := b.client.ExportStackDeployment(ctx, stack, version, showSecrets)
 	if err != nil {
 		return nil, err
 	}

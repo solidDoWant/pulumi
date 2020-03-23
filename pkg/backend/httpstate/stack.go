@@ -123,7 +123,7 @@ func (s *cloudStack) Snapshot(ctx context.Context) (*deploy.Snapshot, error) {
 		return *s.snapshot, nil
 	}
 
-	snap, err := s.b.getSnapshot(ctx, s.ref)
+	snap, err := s.b.getSnapshot(ctx, s)
 	if err != nil {
 		return nil, err
 	}
@@ -165,8 +165,8 @@ func (s *cloudStack) GetLogs(ctx context.Context, cfg backend.StackConfiguration
 	return backend.GetStackLogs(ctx, s, cfg, query)
 }
 
-func (s *cloudStack) ExportDeployment(ctx context.Context) (*apitype.UntypedDeployment, error) {
-	return backend.ExportStackDeployment(ctx, s)
+func (s *cloudStack) ExportDeployment(ctx context.Context, showSecrets bool) (*apitype.UntypedDeployment, error) {
+	return backend.ExportStackDeployment(ctx, s, showSecrets)
 }
 
 func (s *cloudStack) ImportDeployment(ctx context.Context, deployment *apitype.UntypedDeployment) error {

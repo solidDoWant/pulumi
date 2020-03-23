@@ -31,6 +31,7 @@ func newStackExportCmd() *cobra.Command {
 	var file string
 	var stackName string
 	var version string
+	var showSecrets bool
 
 	cmd := &cobra.Command{
 		Use:   "export",
@@ -58,7 +59,7 @@ func newStackExportCmd() *cobra.Command {
 			// Export the latest version of the checkpoint by default. Otherwise, we require that
 			// the backend/stack implements the ability the export previous checkpoints.
 			if version == "" {
-				deployment, err = s.ExportDeployment(ctx)
+				deployment, err = s.ExportDeployment(ctx, showSecrets)
 				if err != nil {
 					return err
 				}
@@ -72,7 +73,7 @@ func newStackExportCmd() *cobra.Command {
 						be.Name())
 				}
 
-				deployment, err = specificExpBE.ExportDeploymentForVersion(ctx, s, version)
+				deployment, err = specificExpBE.ExportDeploymentForVersion(ctx, s, version, showSecrets)
 				if err != nil {
 					return err
 				}
@@ -102,5 +103,7 @@ func newStackExportCmd() *cobra.Command {
 		&file, "file", "", "", "A filename to write stack output to")
 	cmd.PersistentFlags().StringVarP(
 		&version, "version", "", "", "Previous stack version to export. (If unset, will export the latest.)")
+	cmd.PersistentFlags().BoolVarP(
+		&showSecrets, "show-secrets", "", false, "Show secrets in export. Defaults to `false`")
 	return cmd
 }

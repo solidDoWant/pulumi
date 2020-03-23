@@ -50,7 +50,7 @@ type MockBackend struct {
 	GetHistoryF             func(context.Context, StackReference) ([]UpdateInfo, error)
 	GetStackTagsF           func(context.Context, Stack) (map[apitype.StackTagName]string, error)
 	UpdateStackTagsF        func(context.Context, Stack, map[apitype.StackTagName]string) error
-	ExportDeploymentF       func(context.Context, Stack) (*apitype.UntypedDeployment, error)
+	ExportDeploymentF       func(context.Context, Stack, bool) (*apitype.UntypedDeployment, error)
 	ImportDeploymentF       func(context.Context, Stack, *apitype.UntypedDeployment) error
 	LogoutF                 func() error
 	CurrentUserF            func() (string, error)
@@ -268,10 +268,10 @@ func (be *MockBackend) UpdateStackTags(ctx context.Context, stack Stack,
 }
 
 func (be *MockBackend) ExportDeployment(ctx context.Context,
-	stack Stack) (*apitype.UntypedDeployment, error) {
+	stack Stack, showSecrets bool) (*apitype.UntypedDeployment, error) {
 
 	if be.ExportDeploymentF != nil {
-		return be.ExportDeploymentF(ctx, stack)
+		return be.ExportDeploymentF(ctx, stack, showSecrets)
 	}
 	panic("not implemented")
 }
@@ -318,7 +318,7 @@ type MockStack struct {
 	RenameF   func(ctx context.Context, newName tokens.QName) error
 	GetLogsF  func(ctx context.Context, cfg StackConfiguration,
 		query operations.LogQuery) ([]operations.LogEntry, error)
-	ExportDeploymentF func(ctx context.Context) (*apitype.UntypedDeployment, error)
+	ExportDeploymentF func(ctx context.Context, showSecrets bool) (*apitype.UntypedDeployment, error)
 	ImportDeploymentF func(ctx context.Context, deployment *apitype.UntypedDeployment) error
 }
 
@@ -416,9 +416,9 @@ func (ms *MockStack) GetLogs(ctx context.Context, cfg StackConfiguration,
 	panic("not implemented")
 }
 
-func (ms *MockStack) ExportDeployment(ctx context.Context) (*apitype.UntypedDeployment, error) {
+func (ms *MockStack) ExportDeployment(ctx context.Context, showSecrets bool) (*apitype.UntypedDeployment, error) {
 	if ms.ExportDeploymentF != nil {
-		return ms.ExportDeploymentF(ctx)
+		return ms.ExportDeploymentF(ctx, showSecrets)
 	}
 	panic("not implemented")
 }
